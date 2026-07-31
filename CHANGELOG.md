@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.1] - 2026-07-31
+
+### Added
+- OpenWU **W monogram** branding (blueprint embossed mark) as multi-size app icon and About/README logo.
+- `scripts/build-icon-from-logo.ps1` helper to rebuild ICO/PNG from a source mark.
+
+### Changed
+- About dialog: mark image, clearer disclaimer text, form icon from EXE.
+- Assembly company/product metadata set to **OpenWU Contributors** / **OpenWU** (product-native, not org branding).
+- CLI (`openwu-cli.exe`) uses the same application icon.
+- Version **0.2.1**.
+
+---
+
 ## [0.2.0] - 2026-07-31
 
 ### Added

@@ -21,3 +21,4 @@ publish/
 # Logs & temp
 *.log
 *.tmp
+scripts/_icobuild/

@@ -7,12 +7,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\openwu.ico</ApplicationIcon>
     <AssemblyName>OpenWU</AssemblyName>
     <RootNamespace>OpenWu.App</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\OpenWu.Core\OpenWu.Core.csproj" />
+    <ProjectReference Include="..\OpenWu.CliLib\OpenWu.CliLib.csproj" />
   </ItemGroup>
 
 </Project>

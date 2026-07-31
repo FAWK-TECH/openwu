@@ -2,6 +2,15 @@
 
 OpenWU features a classic WinForms desktop interface designed for fast, efficient Windows Update management without complex telemetry or web view overhead.
 
+## Screenshots (repo)
+
+See `docs/images/`:
+
+- `gui-main.png` — Updates tab (grid + detail pane)
+- `gui-history.png` — History tab
+- `gui-settings.png` — Settings / Policy
+- `gui-about.png` — About dialog
+
 ## Layout Overview
 
 ```

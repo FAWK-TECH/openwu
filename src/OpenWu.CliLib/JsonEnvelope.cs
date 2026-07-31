@@ -4,12 +4,12 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace OpenWu.App.Cli;
+namespace OpenWu.CliLib;
 
 /// <summary>
-/// Stable CLI JSON contract for automation. Always wrap payloads — never emit a bare array.
+/// Stable CLI JSON contract. Always wrap payloads — never emit a bare array.
 /// </summary>
-internal static class JsonEnvelope
+public static class JsonEnvelope
 {
     public static readonly JsonSerializerOptions Options = new()
     {
@@ -23,15 +23,16 @@ internal static class JsonEnvelope
         get
         {
             var asm = typeof(JsonEnvelope).Assembly;
-            var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            // Prefer informational version from entry assembly (openwu-cli / OpenWU)
+            var entry = Assembly.GetEntryAssembly() ?? asm;
+            var info = entry.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
             if (!string.IsNullOrWhiteSpace(info))
             {
-                // Strip any SourceLink "+commit" suffix for display
                 var plus = info.IndexOf('+', StringComparison.Ordinal);
                 return plus > 0 ? info[..plus] : info;
             }
 
-            return asm.GetName().Version?.ToString(3) ?? "0.1.0";
+            return entry.GetName().Version?.ToString(3) ?? "0.2.0";
         }
     }
 
@@ -44,19 +45,17 @@ internal static class JsonEnvelope
         }
     }
 
-    public static void WriteSuccess(string verb, object payloadFields)
-    {
-        // payloadFields is merged conceptually via anonymous object built by callers
-        Console.WriteLine(JsonSerializer.Serialize(payloadFields, Options));
-    }
+    public static void Write(object envelope) =>
+        Console.WriteLine(JsonSerializer.Serialize(envelope, Options));
 
-    public static object Base(string verb, bool ok, string? message = null) => new
+    public static object Test(bool ok, object health, string? message = null) => new
     {
         ok,
         host = HostName,
         version = AppVersion,
-        verb,
-        message
+        verb = "test",
+        message,
+        health
     };
 
     public static object List(bool ok, IReadOnlyList<object> updates, string? message = null) => new
@@ -80,16 +79,6 @@ internal static class JsonEnvelope
         requestedLast,
         count = entries.Count,
         history = entries
-    };
-
-    public static object Test(bool ok, object health, string? message = null) => new
-    {
-        ok,
-        host = HostName,
-        version = AppVersion,
-        verb = "test",
-        message,
-        health
     };
 
     public static object Install(
@@ -149,6 +138,12 @@ internal static class JsonEnvelope
         exitCode
     };
 
-    public static void Write(object envelope) =>
-        Console.WriteLine(JsonSerializer.Serialize(envelope, Options));
+    public static object Version() => new
+    {
+        ok = true,
+        host = HostName,
+        version = AppVersion,
+        verb = "version",
+        product = "OpenWU"
+    };
 }

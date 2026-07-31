@@ -7,7 +7,7 @@ using OpenWu.Core.Guard;
 using OpenWu.Core.Model;
 using OpenWu.Core.Policy;
 
-namespace OpenWu.App.Cli;
+namespace OpenWu.CliLib;
 
 public static class CliHost
 {
@@ -20,14 +20,9 @@ public static class CliHost
         catch (Exception ex)
         {
             if (args.Any(a => a.Equals("--json", StringComparison.OrdinalIgnoreCase)))
-            {
                 JsonEnvelope.Write(JsonEnvelope.Error("unknown", ex.Message, 3));
-            }
             else
-            {
                 Console.Error.WriteLine($"[ERROR] Unhandled CLI exception: {ex.Message}");
-            }
-
             return 3;
         }
     }
@@ -45,21 +40,9 @@ public static class CliHost
             args[0].Equals("version", StringComparison.OrdinalIgnoreCase))
         {
             if (HasFlag(args, "--json"))
-            {
-                JsonEnvelope.Write(new
-                {
-                    ok = true,
-                    host = JsonEnvelope.HostName,
-                    version = JsonEnvelope.AppVersion,
-                    verb = "version",
-                    product = "OpenWU"
-                });
-            }
+                JsonEnvelope.Write(JsonEnvelope.Version());
             else
-            {
-                Console.WriteLine($"OpenWU {JsonEnvelope.AppVersion}");
-            }
-
+                Console.WriteLine($"OpenWU v{JsonEnvelope.AppVersion}");
             return 0;
         }
 
@@ -90,7 +73,6 @@ public static class CliHost
             Console.Error.WriteLine($"[ERROR] {msg}");
             ShowHelp();
         }
-
         return 1;
     }
 
@@ -127,13 +109,10 @@ public static class CliHost
 
     private static async Task<int> HandleListAsync(UpdateService service, string[] args, bool json)
     {
-        bool includeDrivers = HasFlag(args, "--include-drivers");
-        bool includeHidden = HasFlag(args, "--include-hidden");
-
         var opts = new SearchOptions
         {
-            IncludeDrivers = includeDrivers,
-            IncludeHidden = includeHidden
+            IncludeDrivers = HasFlag(args, "--include-drivers"),
+            IncludeHidden = HasFlag(args, "--include-hidden")
         };
 
         var statusProgress = json ? null : new Progress<string>(msg => Console.WriteLine($"[SEARCH] {msg}"));
@@ -153,8 +132,8 @@ public static class CliHost
             Console.WriteLine(new string('-', 85));
             foreach (var u in items)
             {
-                string titleCut = u.Title.Length > 32 ? u.Title.Substring(0, 29) + "..." : u.Title;
-                string catCut = u.Categories.Length > 18 ? u.Categories.Substring(0, 15) + "..." : u.Categories;
+                string titleCut = u.Title.Length > 32 ? u.Title[..29] + "..." : u.Title;
+                string catCut = u.Categories.Length > 18 ? u.Categories[..15] + "..." : u.Categories;
                 Console.WriteLine($"{u.Kb,-12} | {u.SizeMB,8:F1} | {u.Severity,-10} | {catCut,-18} | {titleCut}");
             }
         }
@@ -188,7 +167,7 @@ public static class CliHost
             foreach (var h in history)
             {
                 string dateStr = h.Date.ToString("yyyy-MM-dd HH:mm");
-                string titleCut = h.Title.Length > 30 ? h.Title.Substring(0, 27) + "..." : h.Title;
+                string titleCut = h.Title.Length > 30 ? h.Title[..27] + "..." : h.Title;
                 Console.WriteLine($"{dateStr,-20} | {h.Kb,-12} | {h.Result,-20} | {titleCut}");
             }
         }
@@ -199,9 +178,7 @@ public static class CliHost
     private static async Task<int> HandleInstallAsync(UpdateService service, string[] args, bool json)
     {
         if (!SafetyGuards.IsElevated())
-        {
             return Fail("install", "Installation requires administrative elevation.", 2, json);
-        }
 
         bool whatif = HasFlag(args, "--whatif");
         bool force = HasFlag(args, "--force");
@@ -221,17 +198,11 @@ public static class CliHost
             targets = items.Where(u => kbSet.Contains(SafetyGuards.NormalizeKb(u.Kb))).ToList();
         }
         else if (securityOnly)
-        {
             targets = items.Where(SafetyGuards.IsSecurityUpdate).ToList();
-        }
         else if (installAll)
-        {
             targets = items.ToList();
-        }
         else
-        {
             return Fail("install", "Must specify --all, --security-only, or --kb <KB> for install.", 1, json);
-        }
 
         var selectedKbs = targets.Select(t => t.Kb).Where(k => !string.IsNullOrWhiteSpace(k)).ToList();
 
@@ -240,8 +211,7 @@ public static class CliHost
             if (json)
             {
                 JsonEnvelope.Write(JsonEnvelope.Install(
-                    ok: true,
-                    whatIf: whatif,
+                    ok: true, whatIf: whatif,
                     selected: Array.Empty<string>(),
                     installed: Array.Empty<string>(),
                     failed: Array.Empty<string>(),
@@ -249,10 +219,7 @@ public static class CliHost
                     message: "No matching updates found to install."));
             }
             else
-            {
                 Console.WriteLine("No matching updates found to install.");
-            }
-
             return 0;
         }
 
@@ -270,10 +237,6 @@ public static class CliHost
 
         var installed = result.InstalledKbs?.ToList() ?? new List<string>();
         var failed = result.FailedKbs?.ToList() ?? new List<string>();
-        if (installed.Count == 0 && result.Success && !whatif && result.InstalledCount > 0)
-            installed = selectedKbs;
-        if (whatif && result.Success)
-            installed = Array.Empty<string>().ToList();
 
         if (json)
         {
@@ -292,8 +255,6 @@ public static class CliHost
             Console.WriteLine($"Install Result: {(result.Success ? "SUCCESS" : "FAILED")}");
             Console.WriteLine($"Message: {result.Message}");
             Console.WriteLine($"Reboot Required: {result.RebootRequired}");
-            if (selectedKbs.Count > 0)
-                Console.WriteLine($"Selected: {string.Join(", ", selectedKbs)}");
         }
 
         if (!result.Success && result.Message.Contains("Domain Controller", StringComparison.OrdinalIgnoreCase))
@@ -320,30 +281,18 @@ public static class CliHost
         if (targets.Count == 0)
         {
             if (json)
-            {
-                JsonEnvelope.Write(JsonEnvelope.HideShow("hide", true, kbs, persist,
-                    "No matching updates found for specified KB(s)."));
-            }
+                JsonEnvelope.Write(JsonEnvelope.HideShow("hide", true, kbs, persist, "No matching updates found for specified KB(s)."));
             else
-            {
                 Console.WriteLine("No matching updates found for specified KB(s).");
-            }
-
             return 0;
         }
 
         await service.HideAsync(targets, persist);
 
         if (json)
-        {
-            JsonEnvelope.Write(JsonEnvelope.HideShow("hide", true, matched, persist,
-                $"Successfully hid {targets.Count} update(s)."));
-        }
+            JsonEnvelope.Write(JsonEnvelope.HideShow("hide", true, matched, persist, $"Successfully hid {targets.Count} update(s)."));
         else
-        {
             Console.WriteLine($"Successfully hid {targets.Count} update(s). (Persist policy: {persist})");
-        }
-
         return 0;
     }
 
@@ -364,30 +313,18 @@ public static class CliHost
         if (targets.Count == 0)
         {
             if (json)
-            {
-                JsonEnvelope.Write(JsonEnvelope.HideShow("show", true, kbs, persist: false,
-                    "No matching updates found for specified KB(s)."));
-            }
+                JsonEnvelope.Write(JsonEnvelope.HideShow("show", true, kbs, false, "No matching updates found for specified KB(s)."));
             else
-            {
                 Console.WriteLine("No matching updates found for specified KB(s).");
-            }
-
             return 0;
         }
 
         await service.UnhideAsync(targets);
 
         if (json)
-        {
-            JsonEnvelope.Write(JsonEnvelope.HideShow("show", true, matched, persist: false,
-                $"Successfully unhid {targets.Count} update(s)."));
-        }
+            JsonEnvelope.Write(JsonEnvelope.HideShow("show", true, matched, false, $"Successfully unhid {targets.Count} update(s)."));
         else
-        {
             Console.WriteLine($"Successfully unhid {targets.Count} update(s).");
-        }
-
         return 0;
     }
 
@@ -405,7 +342,7 @@ public static class CliHost
             if (json)
                 JsonEnvelope.Write(JsonEnvelope.Policy(true, "show", MapPolicy(p)));
             else
-                JsonEnvelope.Write(MapPolicy(p)); // human policy show was already JSON; keep readable
+                JsonEnvelope.Write(MapPolicy(p));
             return 0;
         }
 
@@ -428,22 +365,14 @@ public static class CliHost
                 string val = args[i + 1];
                 if (key.Equals("includeDrivers", StringComparison.OrdinalIgnoreCase) ||
                     key.Equals("include-drivers", StringComparison.OrdinalIgnoreCase))
-                {
                     p.IncludeDrivers = bool.Parse(val);
-                }
                 else if (key.Equals("allowOnDomainController", StringComparison.OrdinalIgnoreCase) ||
                          key.Equals("allow-on-domain-controller", StringComparison.OrdinalIgnoreCase))
-                {
                     p.AllowOnDomainController = bool.Parse(val);
-                }
                 else if (key.Equals("service", StringComparison.OrdinalIgnoreCase))
-                {
                     p.Service = val;
-                }
                 else if (key.Equals("reboot", StringComparison.OrdinalIgnoreCase))
-                {
                     p.Reboot = val;
-                }
             }
 
             store.Save(p);
@@ -508,7 +437,6 @@ public static class CliHost
             if (args[i].Equals(flag, StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out int val))
                 return val;
         }
-
         return defaultValue;
     }
 
@@ -520,27 +448,26 @@ public static class CliHost
             if (args[i].Equals(flag, StringComparison.OrdinalIgnoreCase))
                 result.Add(args[i + 1]);
         }
-
         return result;
     }
 
     private static void ShowHelp()
     {
-        Console.WriteLine($@"OpenWU {JsonEnvelope.AppVersion} — Universal Windows Update Manager
+        Console.WriteLine($@"OpenWU v{JsonEnvelope.AppVersion} - Universal Windows Update Manager
 
 Usage:
   OpenWU.exe                             (Starts the WinForms GUI)
-  OpenWU.exe test [--json]
-  OpenWU.exe list [--json] [--include-drivers] [--include-hidden]
-  OpenWU.exe history [--last N] [--json]
-  OpenWU.exe install --security-only|--all|--kb KB... [--whatif] [--force] [--reboot] [--allow-domain-controller] [--json]
-  OpenWU.exe hide --kb KB... [--persist] [--json]
-  OpenWU.exe show --kb KB... [--json]
-  OpenWU.exe policy show|set|reset [--json]
-  OpenWU.exe --help
-  OpenWU.exe --version [--json]
+  openwu-cli.exe test [--json]
+  openwu-cli.exe list [--json] [--include-drivers] [--include-hidden]
+  openwu-cli.exe history [--last N] [--json]
+  openwu-cli.exe install --security-only|--all|--kb KB... [--whatif] [--force] [--reboot] [--allow-domain-controller] [--json]
+  openwu-cli.exe hide --kb KB... [--persist] [--json]
+  openwu-cli.exe show --kb KB... [--json]
+  openwu-cli.exe policy show|set|reset [--json]
+  openwu-cli.exe --help
+  openwu-cli.exe --version [--json]
 
-JSON output is always an object envelope (ok, host, version, verb, ...) — never a bare array.
+JSON output is always an object envelope (ok, host, version, verb, ...) - never a bare array.
 ");
     }
 }

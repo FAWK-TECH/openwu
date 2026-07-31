@@ -1,5 +1,5 @@
 using System;
-using OpenWu.App.Cli;
+using OpenWu.CliLib;
 
 namespace OpenWu.Cli;
 

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using OpenWu.Core.Guard;
+using OpenWu.Core.Logging;
 using OpenWu.Core.Model;
 using OpenWu.Core.Policy;
 using OpenWu.Core.Wua;
@@ -87,6 +88,16 @@ public sealed class UpdateService
 
         var result = await _wua.InstallAsync(items, opt, progress, ct).ConfigureAwait(false);
 
+        if (!opt.WhatIf)
+        {
+            var kbs = items.Select(x => x.Kb);
+            var extra = new Dictionary<string, string>
+            {
+                { "rebootRequired", result.RebootRequired.ToString().ToLowerInvariant() }
+            };
+            ActionLog.Write("install", result.Success, kbs, result.Message, extra);
+        }
+
         if (result.Success && opt.RebootIfRequired && result.RebootRequired)
         {
             // Execute reboot if opt.RebootIfRequired is checked
@@ -121,6 +132,9 @@ public sealed class UpdateService
             }
             _policyStore.Save(policy);
         }
+
+        var extra = new Dictionary<string, string> { { "persist", persistPolicy.ToString().ToLowerInvariant() } };
+        ActionLog.Write("hide", true, list.Select(x => x.Kb), "Updates hidden successfully", extra);
     }
 
     public async Task UnhideAsync(IEnumerable<UpdateRow> items, CancellationToken ct = default)
@@ -142,5 +156,7 @@ public sealed class UpdateService
         {
             _policyStore.Save(policy);
         }
+
+        ActionLog.Write("unhide", true, list.Select(x => x.Kb), "Updates unhidden successfully");
     }
 }

@@ -35,6 +35,7 @@ public partial class MainForm : Form
     private ToolStripButton _btnSelectAll = null!;
     private ToolStripButton _btnSelectNone = null!;
     private ToolStripButton _btnHistoryTab = null!;
+    private ToolStripButton _btnAbout = null!;
 
     private CheckBox _chkDrivers = null!;
     private CheckBox _chkOptional = null!;
@@ -104,6 +105,7 @@ public partial class MainForm : Form
         _btnSelectAll = new ToolStripButton("Select All") { DisplayStyle = ToolStripItemDisplayStyle.Text };
         _btnSelectNone = new ToolStripButton("Select None") { DisplayStyle = ToolStripItemDisplayStyle.Text };
         _btnHistoryTab = new ToolStripButton("History") { DisplayStyle = ToolStripItemDisplayStyle.Text };
+        _btnAbout = new ToolStripButton("About") { DisplayStyle = ToolStripItemDisplayStyle.Text };
 
         _btnRefresh.Click += async (s, e) => await RefreshPendingUpdatesAsync();
         _btnDownload.Click += async (s, e) => await DownloadSelectedAsync();
@@ -114,6 +116,7 @@ public partial class MainForm : Form
         _btnSelectAll.Click += (s, e) => SelectAllRows();
         _btnSelectNone.Click += (s, e) => SelectNoneRows();
         _btnHistoryTab.Click += (s, e) => _tabControl.SelectedTab = _tabHistory;
+        _btnAbout.Click += (s, e) => ShowAboutForm();
 
         _toolStrip.Items.AddRange(new ToolStripItem[]
         {
@@ -129,7 +132,9 @@ public partial class MainForm : Form
             _btnSelectAll,
             _btnSelectNone,
             new ToolStripSeparator(),
-            _btnHistoryTab
+            _btnHistoryTab,
+            new ToolStripSeparator(),
+            _btnAbout
         });
 
         var pnlOptions = new FlowLayoutPanel
@@ -768,6 +773,12 @@ public partial class MainForm : Form
     {
         foreach (DataGridViewRow row in _grid.Rows)
             row.Cells["Check"].Value = false;
+    }
+
+    private void ShowAboutForm()
+    {
+        using var about = new AboutForm();
+        about.ShowDialog(this);
     }
 
     private List<UpdateRow> GetCheckedRows()

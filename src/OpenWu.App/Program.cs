@@ -2,8 +2,8 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
-using OpenWu.App.Cli;
 using OpenWu.App.Gui;
+using OpenWu.CliLib;
 
 namespace OpenWu.App;
 

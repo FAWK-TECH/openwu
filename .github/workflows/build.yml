@@ -1,0 +1,58 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore OpenWu.sln
+
+      - name: Build solution
+        run: dotnet build OpenWu.sln -c Release --no-restore
+
+      - name: Run unit tests
+        run: dotnet test OpenWu.sln -c Release --no-build --verbosity normal
+
+      - name: Publish EXEs
+        run: pwsh -ExecutionPolicy Bypass -File ./scripts/publish.ps1
+
+      - name: Generate SHA256 checksums
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          Set-Location artifacts/win-x64
+          Get-FileHash OpenWU.exe,openwu-cli.exe -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash)  $($_.Path | Split-Path -Leaf)" } |
+            Set-Content SHA256SUMS.txt
+          Get-Content SHA256SUMS.txt
+
+      - name: Upload Release Assets
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/win-x64/OpenWU.exe
+            artifacts/win-x64/openwu-cli.exe
+            artifacts/win-x64/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

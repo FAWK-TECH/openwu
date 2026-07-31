@@ -1,0 +1,23 @@
+# Build & Output Directories
+[Bb]in/
+[Oo]bj/
+artifacts/
+publish/
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.workspace
+
+# Logs & temp
+*.log
+*.tmp

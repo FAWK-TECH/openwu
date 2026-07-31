@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "service": "MicrosoftUpdate",
+  "includeDrivers": true,
+  "includeOptional": false,
+  "autoSelect": "SecurityOnly",
+  "reboot": "IfRequired",
+  "hiddenKBs": ["KB5031234"],
+  "denyTitlesContains": ["Preview", "Beta"],
+  "allowOnDomainController": false,
+  "maxInstallBatch": 25,
+  "searchTimeoutSec": 300
+}

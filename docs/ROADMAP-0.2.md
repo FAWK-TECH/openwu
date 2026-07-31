@@ -293,6 +293,14 @@ Stop for human review before tagging v0.2.0 if CI is new.
 - Dark mode / i18n  
 - Multi-PC remoting  
 
+### Remember later (do not do in 0.2)
+
+**winget distribution (post-0.2):** After 0.2 ships (CI releases + SHA256), consider publishing **OpenWU itself** to winget (`winget install …`) so people can install/update the tool easily. Point the manifest at GitHub Release assets.
+
+**Not in scope even then (unless product pivot):** folding **winget package management** into OpenWU’s GUI/CLI (app upgrades via winget). OpenWU stays **Windows Update Agent only**. winget = how users get OpenWU, not a second update engine inside the app.
+
+Track as: **0.3 packaging / distribution**, not a 0.2 workstream.
+
 ---
 
 ## Definition of Done (0.2)

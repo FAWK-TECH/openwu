@@ -87,6 +87,14 @@ public partial class MainForm : Form
         MinimumSize = new Size(920, 580);
         Size = new Size(1040, 680);
         StartPosition = FormStartPosition.CenterScreen;
+        try
+        {
+            // Prefer embedded EXE icon (ApplicationIcon) so single-file publish shows the W mark
+            var path = Environment.ProcessPath ?? Application.ExecutablePath;
+            if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                Icon = Icon.ExtractAssociatedIcon(path);
+        }
+        catch { /* decorative */ }
 
         _toolStrip = new ToolStrip
         {

@@ -1,5 +1,9 @@
 # OpenWU — Universal Windows Update Manager (GUI + CLI)
 
+<p align="center">
+  <img src="docs/images/logo.png" alt="OpenWU mark" width="160" />
+</p>
+
 > Open, auditable Windows Update control — GUI like WUMT, engine you can trust.
 
 OpenWU is a general-purpose, open-source Windows Update management tool built on **.NET 8** and native Windows Update Agent (WUA) COM APIs. It provides a classic desktop GUI (WinForms) for interactive update management alongside a separate, lightweight CLI executable (`openwu-cli.exe`) with `--json` support for enterprise automation.

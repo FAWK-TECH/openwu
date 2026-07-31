@@ -17,4 +17,8 @@
     <ProjectReference Include="..\OpenWu.CliLib\OpenWu.CliLib.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="Assets\openwu-mark.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

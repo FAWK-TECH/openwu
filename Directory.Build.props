@@ -5,7 +5,8 @@
     <FileVersion>0.2.0.0</FileVersion>
     <InformationalVersion>0.2.0</InformationalVersion>
     <Authors>OpenWU Contributors</Authors>
-    <Company>FAWK-TECH</Company>
-    <Product>OpenWU Universal Windows Update Manager</Product>
+    <Company>OpenWU Contributors</Company>
+    <Product>OpenWU</Product>
+    <Copyright>Copyright (c) 2026 OpenWU Contributors</Copyright>
   </PropertyGroup>
 </Project>

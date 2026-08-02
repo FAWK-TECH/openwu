@@ -5,6 +5,21 @@ All notable changes to OpenWU will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-31
+
+### Added
+- **Design Tokens System (`UiTheme.cs`)**: Centralized palette tokens (Slate `#0F172A`, `#F8FAFC`, `#E2E8F0`, `#0EA5E9`), font definitions, and grid/toolbar theme apply methods.
+- **Empty State Overlay**: Clean empty state panel over updates grid when 0 pending updates are returned, displaying last checked timestamp and refresh trigger.
+- **Enhanced DataGridView Tooltips**: Full update title and description snippets in cell tooltips on hover.
+- **Structured Settings Layout**: Organized policy configuration into distinct `GroupBox` sections (Source & Defaults, Safety Guards, Hidden KBs).
+- **PerMonitorV2 High-DPI Support**: Added explicit `Application.SetHighDpiMode(HighDpiMode.PerMonitorV2)` for crisp rendering across multi-monitor setups.
+- **Clickable Links & Polish**: Repository link in About dialog and updated documentation screenshots.
+
+### Changed
+- Refactored toolbar action hierarchy with `Install` as visually primary action and clear logical separator groupings.
+- Updated status cell formatting in History tab (`Succeeded` emerald green, `Failed` red).
+- Version set to `0.3.0` across solution.
+
 ---
 
 ## [0.2.1] - 2026-07-31

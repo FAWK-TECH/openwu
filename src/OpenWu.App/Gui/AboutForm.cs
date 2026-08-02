@@ -16,18 +16,19 @@ public sealed class AboutForm : Form
 
     private void InitializeComponent()
     {
-        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.2.0";
+        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "0.3.0";
         var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
         var logDir = Path.Combine(programData, "OpenWU", "logs");
 
         Text = "About OpenWU";
-        Size = new Size(560, 460);
+        Size = new Size(580, 480);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
-        BackColor = Color.FromArgb(248, 250, 252);
+        Font = UiTheme.FontBody;
+        BackColor = UiTheme.PageBack;
+
         try
         {
             Icon = Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? Application.ExecutablePath);
@@ -38,7 +39,7 @@ public sealed class AboutForm : Form
         {
             Dock = DockStyle.Top,
             Height = 96,
-            BackColor = Color.FromArgb(28, 28, 30),
+            BackColor = UiTheme.HeaderBack,
             Padding = new Padding(16, 14, 16, 14)
         };
 
@@ -54,8 +55,8 @@ public sealed class AboutForm : Form
         var lblTitle = new Label
         {
             Text = $"OpenWU v{version}",
-            Font = new Font("Segoe UI", 16F, FontStyle.Bold, GraphicsUnit.Point),
-            ForeColor = Color.White,
+            Font = new Font("Segoe UI", 16F, FontStyle.Bold),
+            ForeColor = UiTheme.HeaderText,
             AutoSize = true,
             Location = new Point(94, 18)
         };
@@ -63,8 +64,8 @@ public sealed class AboutForm : Form
         var lblSubtitle = new Label
         {
             Text = "Open, auditable Windows Update control",
-            Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point),
-            ForeColor = Color.FromArgb(180, 180, 185),
+            Font = UiTheme.FontBody,
+            ForeColor = UiTheme.HeaderMuted,
             AutoSize = true,
             Location = new Point(96, 52)
         };
@@ -79,6 +80,25 @@ public sealed class AboutForm : Form
             Padding = new Padding(20, 16, 20, 8)
         };
 
+        var lblRepo = new LinkLabel
+        {
+            Text = "Repository: https://github.com/FAWK-TECH/openwu",
+            Font = UiTheme.FontBold,
+            LinkColor = UiTheme.AccentPrimary,
+            ActiveLinkColor = UiTheme.AccentHover,
+            AutoSize = true,
+            Dock = DockStyle.Top,
+            Padding = new Padding(0, 0, 0, 8)
+        };
+        lblRepo.LinkClicked += (s, e) =>
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo("https://github.com/FAWK-TECH/openwu") { UseShellExecute = true });
+            }
+            catch { }
+        };
+
         var txtInfo = new TextBox
         {
             Multiline = true,
@@ -86,12 +106,11 @@ public sealed class AboutForm : Form
             ScrollBars = ScrollBars.Vertical,
             Dock = DockStyle.Fill,
             BorderStyle = BorderStyle.None,
-            BackColor = Color.FromArgb(248, 250, 252),
-            Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+            BackColor = UiTheme.PageBack,
+            Font = UiTheme.FontBody,
             Text =
                 "OpenWU is an open-source Windows Update manager built on .NET 8 " +
                 "and native Windows Update Agent (WUA) COM APIs." + Environment.NewLine + Environment.NewLine +
-                "Repository: https://github.com/FAWK-TECH/openwu" + Environment.NewLine +
                 "License: MIT — Copyright (c) 2026 OpenWU Contributors" + Environment.NewLine + Environment.NewLine +
                 "DISCLAIMER" + Environment.NewLine +
                 "OpenWU is an administrator utility for the local machine. " +
@@ -105,14 +124,17 @@ public sealed class AboutForm : Form
         {
             Dock = DockStyle.Bottom,
             Height = 52,
-            Padding = new Padding(16, 10, 16, 10)
+            Padding = new Padding(16, 10, 16, 10),
+            BackColor = UiTheme.SurfaceBack
         };
 
         var btnOpenLogs = new Button
         {
             Text = "Open Log Folder",
             Size = new Size(130, 30),
-            Location = new Point(16, 10)
+            Location = new Point(16, 10),
+            Font = UiTheme.FontBody,
+            FlatStyle = FlatStyle.System
         };
         btnOpenLogs.Click += (_, _) =>
         {
@@ -129,6 +151,8 @@ public sealed class AboutForm : Form
             Text = "Close",
             DialogResult = DialogResult.OK,
             Size = new Size(90, 30),
+            Font = UiTheme.FontBold,
+            FlatStyle = FlatStyle.System,
             Anchor = AnchorStyles.Top | AnchorStyles.Right
         };
         pnlBottom.Resize += (_, _) =>
@@ -140,6 +164,7 @@ public sealed class AboutForm : Form
         pnlBottom.Controls.Add(btnOpenLogs);
         pnlBottom.Controls.Add(btnClose);
         pnlContent.Controls.Add(txtInfo);
+        pnlContent.Controls.Add(lblRepo);
 
         Controls.Add(pnlContent);
         Controls.Add(pnlHeader);
@@ -157,7 +182,6 @@ public sealed class AboutForm : Form
                 mark = Path.Combine(AppContext.BaseDirectory, "openwu-mark.png");
             if (File.Exists(mark))
             {
-                // Clone so file is not locked
                 using var fs = File.OpenRead(mark);
                 pic.Image = Image.FromStream(fs);
                 return;

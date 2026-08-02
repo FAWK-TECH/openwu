@@ -1,52 +1,71 @@
 # OpenWU GUI Specification & Layout
 
-OpenWU features a classic WinForms desktop interface designed for fast, efficient Windows Update management without complex telemetry or web view overhead.
+OpenWU features a polished WinForms desktop interface designed for fast, efficient Windows Update management without complex telemetry, web view overhead, or background service bloat.
 
-## Screenshots (repo)
+---
+
+## Visual Design & Screenshots (v0.3.0)
 
 See `docs/images/`:
 
-- `gui-main.png` — Updates tab (grid + detail pane)
-- `gui-history.png` — History tab
-- `gui-settings.png` — Settings / Policy
-- `gui-about.png` — About dialog
+- `gui-main.png` — Updates tab (empty state overlay / grid + detail pane)
+- `gui-history.png` — History tab (formatted status badges)
+- `gui-settings.png` — Settings / Policy (GroupBox layout)
+- `gui-about.png` — About dialog (W monogram, repo link, log path)
+
+---
 
 ## Layout Overview
 
 ```
 +-----------------------------------------------------------------------------------+
-| OpenWU — Windows Update                                                  [-][square][X] |
+| OpenWU — Windows Update Manager                                           [-][square][X] |
 +-----------------------------------------------------------------------------------+
-| Refresh (F5) | Download | Install | Hide | Unhide | Select Security | Select None | History |
+| Refresh (F5) | Download | INSTALL | Hide | Unhide | Select Security | Select All | About|
 +-----------------------------------------------------------------------------------+
-| [ ] Include drivers  [ ] Include optional  [x] Microsoft Update  ...              |
+| [ ] Include drivers  [ ] Include optional  [x] Microsoft Update  [ ] Persist hides...|
 +-----------------------------------------------------------------------------------+
 | [Updates] [History] [Settings / Policy]                                           |
-| +----+-----------+------------------------------------+----+----------+-----------+
-| |    | KB        | Title                              | MB | Severity | Status    |  dense rows,
-| | [x]| KB5031234 | 2026-07 Security Update...         |650 | Critical | Pending   |  alt stripes,
-| | [ ]| KB5039999 | Windows Driver Update              | 12 | Moderate | Pending   |  severity color
-| +----+-----------+------------------------------------+----+----------+-----------+
+| +-------------------------------------------------------------------------------+ |
+| | [Empty State Panel / Grid]                                                    | |
+| | Title: No pending updates                                                     | |
+| | Body: This PC is up to date for current filters, or nothing matched.          | |
+| | Last checked: 2026-07-31 20:00:00  [Refresh Updates]                          | |
+| +-------------------------------------------------------------------------------+ |
 | | split -----------------------------------------------------------------------   |
 | | Title · meta (KB · size · category · severity)                                  |
 | | Description / release notes (scroll)                                            |
 | | Support URL (link)                                                              |
 +-----------------------------------------------------------------------------------+
-| Ready. Found 2 update(s).                     [Updates: 2] [Admin: OK] [Reboot: Clean]|
+| Ready. Found 0 update(s).                     [Updates: 0] [Admin: OK] [Reboot: Clean]|
 +-----------------------------------------------------------------------------------+
 ```
 
-## Key Interactions
+---
 
-- **Toolbar Buttons**:
-  - `Refresh (F5)`: Asynchronously queries pending updates using WUA COM on a background thread.
-  - `Download`: Downloads checked updates with progress tracking.
-  - `Install`: Executes installation for selected updates.
-  - `Hide / Unhide`: Toggles update visibility in Windows Update database.
-  - `Select Security`: Checks all Security and Critical/Important non-driver updates with a single click.
+## Key Features & Design Tokens (`UiTheme.cs`)
 
-- **Dense grid**: 22px rows, alternating row colors, bold severity text (Critical red / Important orange).
-- **Selection detail pane** (bottom split): live title, meta line, description, support link for the selected row (WUMT-style).
-- **Context menu** (right-click): View details, Copy KB, Copy title, Check/Uncheck row, Hide, Open support URL.
-- **Double-Click Row**: Still opens `UpdateDetailsForm` for a full details window.
-- **Ctrl+C** on grid: copies the selected row KB.
+- **Design Palette**:
+  - Headers / Dark Chrome: Slate 900 (`#0F172A`)
+  - Surface Background: Pure White (`#FFFFFF`) / Page Background (`#F8FAFC`)
+  - Grid Alternate Rows: Slate 50 (`#F8FAFC`)
+  - Primary Accent: Sky 500 (`#0EA5E9`) / Hover (`#0284C7`)
+  - Severity Badges: Critical Red (`#DC2626`), Important Orange (`#D97706`), Moderate Blue (`#2563EB`)
+
+- **Toolbar Hierarchy**:
+  - `Install` button styled as primary action button with bold accent coloring.
+  - Clear group separators: `[Refresh] | [Download] [Install] | [Hide] [Unhide] | [Select...] | [History] | [About]`.
+
+- **Empty State Overlay**:
+  - Centered panel displayed when 0 updates match current search filters.
+  - Shows clear feedback, last checked timestamp, and a direct `Refresh Updates` button.
+
+- **High-DPI Support**:
+  - Configured with `Application.SetHighDpiMode(HighDpiMode.PerMonitorV2)` for crisp rendering on high-resolution displays.
+
+- **Structured Settings**:
+  - Policy items organized into clear `GroupBox` panels (Update Source & Defaults, Safety Guards, Hidden KBs).
+
+- **Rich Tooltips & Context Menu**:
+  - Grid cell tooltips display complete update titles and description summaries.
+  - Context menu provides one-click actions: View details, Copy KB, Copy title, Check/Uncheck row, Hide, Open support URL.

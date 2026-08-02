@@ -35,6 +35,7 @@ internal static class Program
             return exitCode;
         }
 
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         ApplicationConfiguration.Initialize();
         Application.Run(new MainForm());
         return 0;

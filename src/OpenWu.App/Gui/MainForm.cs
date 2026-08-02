@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,14 +15,6 @@ namespace OpenWu.App.Gui;
 
 public partial class MainForm : Form
 {
-    private static readonly Color RowAltBack = Color.FromArgb(248, 249, 251);
-    private static readonly Color RowNormalBack = Color.White;
-    private static readonly Color SeverityCritical = Color.FromArgb(185, 28, 28);
-    private static readonly Color SeverityImportant = Color.FromArgb(194, 65, 12);
-    private static readonly Color SeverityModerate = Color.FromArgb(161, 98, 7);
-    private static readonly Color SeverityLow = Color.FromArgb(21, 128, 61);
-    private static readonly Color SeverityDefault = Color.FromArgb(55, 65, 81);
-
     private readonly UpdateService _service;
     private readonly List<UpdateRow> _currentRows = new();
 
@@ -51,6 +44,14 @@ public partial class MainForm : Form
 
     private DataGridView _grid = null!;
     private SplitContainer _updatesSplit = null!;
+
+    private Panel _pnlEmptyState = null!;
+    private Label _lblEmptyTitle = null!;
+    private Label _lblEmptyBody = null!;
+    private Label _lblEmptyLastChecked = null!;
+    private Button _btnEmptyRefresh = null!;
+    private DateTime? _lastCheckedTime;
+
     private Panel _detailPanel = null!;
     private Label _detailTitle = null!;
     private Label _detailMeta = null!;
@@ -82,31 +83,32 @@ public partial class MainForm : Form
 
     private void BuildUi()
     {
-        Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point);
-        Text = "OpenWU — Windows Update";
-        MinimumSize = new Size(920, 580);
+        Font = UiTheme.FontBody;
+        Text = "OpenWU — Windows Update Manager";
+        MinimumSize = new Size(960, 600);
         Size = new Size(1040, 680);
         StartPosition = FormStartPosition.CenterScreen;
+        BackColor = UiTheme.PageBack;
+
         try
         {
-            // Prefer embedded EXE icon (ApplicationIcon) so single-file publish shows the W mark
             var path = Environment.ProcessPath ?? Application.ExecutablePath;
             if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
                 Icon = Icon.ExtractAssociatedIcon(path);
         }
         catch { /* decorative */ }
 
-        _toolStrip = new ToolStrip
-        {
-            ImageScalingSize = new Size(16, 16),
-            GripStyle = ToolStripGripStyle.Hidden,
-            Padding = new Padding(4, 2, 4, 2),
-            Font = new Font("Segoe UI", 9F)
-        };
+        _toolStrip = new ToolStrip();
+        UiTheme.ApplyToolStripStyle(_toolStrip);
 
         _btnRefresh = new ToolStripButton("Refresh (F5)") { DisplayStyle = ToolStripItemDisplayStyle.Text };
         _btnDownload = new ToolStripButton("Download") { DisplayStyle = ToolStripItemDisplayStyle.Text };
-        _btnInstall = new ToolStripButton("Install") { DisplayStyle = ToolStripItemDisplayStyle.Text, Font = new Font(Font, FontStyle.Bold) };
+        _btnInstall = new ToolStripButton("Install")
+        {
+            DisplayStyle = ToolStripItemDisplayStyle.Text,
+            Font = UiTheme.FontBold,
+            ForeColor = UiTheme.AccentHover
+        };
         _btnHide = new ToolStripButton("Hide") { DisplayStyle = ToolStripItemDisplayStyle.Text };
         _btnUnhide = new ToolStripButton("Unhide") { DisplayStyle = ToolStripItemDisplayStyle.Text };
         _btnSelectSecurity = new ToolStripButton("Select Security") { DisplayStyle = ToolStripItemDisplayStyle.Text };
@@ -148,11 +150,12 @@ public partial class MainForm : Form
         var pnlOptions = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 30,
-            Padding = new Padding(6, 3, 6, 2),
+            Height = 32,
+            Padding = new Padding(8, 4, 8, 2),
             Margin = Padding.Empty,
             FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false
+            WrapContents = false,
+            BackColor = UiTheme.SurfaceBack
         };
 
         _chkDrivers = CompactCheck("Include drivers");
@@ -160,7 +163,7 @@ public partial class MainForm : Form
         _chkMsUpdate = CompactCheck("Microsoft Update", checkedByDefault: true);
         _chkPersistHide = CompactCheck("Persist hides");
         _chkAllowDc = CompactCheck("Allow DC install");
-        _chkAllowDc.ForeColor = Color.DarkRed;
+        _chkAllowDc.ForeColor = Color.FromArgb(185, 28, 28);
         _chkReboot = CompactCheck("Reboot if required");
 
         pnlOptions.Controls.AddRange(new Control[]
@@ -169,6 +172,7 @@ public partial class MainForm : Form
         });
 
         BuildGrid();
+        BuildEmptyStatePanel();
         BuildDetailPane();
         BuildContextMenu();
 
@@ -177,30 +181,36 @@ public partial class MainForm : Form
             Dock = DockStyle.Fill,
             Orientation = Orientation.Horizontal,
             SplitterWidth = 6,
-            Panel1MinSize = 120,
-            Panel2MinSize = 100,
-            FixedPanel = FixedPanel.Panel2
+            Panel1MinSize = 140,
+            Panel2MinSize = 120,
+            FixedPanel = FixedPanel.Panel2,
+            BackColor = UiTheme.BorderColor
         };
-        _updatesSplit.Panel1.Controls.Add(_grid);
+        _updatesSplit.Panel1.BackColor = UiTheme.SurfaceBack;
+        _updatesSplit.Panel2.BackColor = UiTheme.SurfaceBack;
+
+        var pnlGridContainer = new Panel { Dock = DockStyle.Fill };
+        pnlGridContainer.Controls.Add(_pnlEmptyState);
+        pnlGridContainer.Controls.Add(_grid);
+
+        _updatesSplit.Panel1.Controls.Add(pnlGridContainer);
         _updatesSplit.Panel2.Controls.Add(_detailPanel);
 
-        // Set splitter after handle exists
         HandleCreated += (_, _) =>
         {
             try
             {
-                if (_updatesSplit.Height > 200)
-                    _updatesSplit.SplitterDistance = Math.Max(160, _updatesSplit.Height - 180);
+                if (_updatesSplit.Height > 240)
+                    _updatesSplit.SplitterDistance = Math.Max(180, _updatesSplit.Height - 180);
             }
-            catch { /* layout not ready */ }
+            catch { /* layout safety */ }
         };
 
-        _tabControl = new TabControl { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9F) };
-        _tabUpdates = new TabPage("Updates") { Padding = new Padding(0) };
-        _tabHistory = new TabPage("History");
-        _tabSettings = new TabPage("Settings / Policy");
+        _tabControl = new TabControl { Dock = DockStyle.Fill, Font = UiTheme.FontBody };
+        _tabUpdates = new TabPage("Updates") { Padding = new Padding(0), BackColor = UiTheme.PageBack };
+        _tabHistory = new TabPage("History") { BackColor = UiTheme.PageBack };
+        _tabSettings = new TabPage("Settings / Policy") { BackColor = UiTheme.PageBack };
 
-        // Order: fill first, then top options so options stay on top
         _tabUpdates.Controls.Add(_updatesSplit);
         _tabUpdates.Controls.Add(pnlOptions);
 
@@ -222,16 +232,19 @@ public partial class MainForm : Form
                 _settingsControl.LoadPolicy();
         };
 
-        _statusStrip = new StatusStrip { Font = new Font("Segoe UI", 8.5F) };
+        _statusStrip = new StatusStrip();
+        UiTheme.ApplyStatusStripStyle(_statusStrip);
+
         _lblStatus = new ToolStripStatusLabel("Ready") { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
-        _lblCount = new ToolStripStatusLabel("Updates: 0") { BorderSides = ToolStripStatusLabelBorderSides.Left, Padding = new Padding(5, 0, 5, 0) };
+        _lblCount = new ToolStripStatusLabel("Updates: 0") { BorderSides = ToolStripStatusLabelBorderSides.Left, Padding = new Padding(6, 0, 6, 0) };
         _lblElevation = new ToolStripStatusLabel(SafetyGuards.IsElevated() ? "Admin: OK" : "Admin: Required")
         {
             BorderSides = ToolStripStatusLabelBorderSides.Left,
-            ForeColor = SafetyGuards.IsElevated() ? Color.DarkGreen : Color.Red,
-            Padding = new Padding(5, 0, 5, 0)
+            ForeColor = SafetyGuards.IsElevated() ? UiTheme.StatusSuccessText : UiTheme.StatusFailedText,
+            Padding = new Padding(6, 0, 6, 0),
+            Font = UiTheme.FontBold
         };
-        _lblReboot = new ToolStripStatusLabel("Reboot: Clean") { BorderSides = ToolStripStatusLabelBorderSides.Left, Padding = new Padding(5, 0, 5, 0) };
+        _lblReboot = new ToolStripStatusLabel("Reboot: Clean") { BorderSides = ToolStripStatusLabelBorderSides.Left, Padding = new Padding(6, 0, 6, 0) };
         _progressBar = new ToolStripProgressBar { Visible = false, Width = 140 };
 
         _statusStrip.Items.AddRange(new ToolStripItem[]
@@ -252,9 +265,81 @@ public partial class MainForm : Form
             Text = text,
             AutoSize = true,
             Checked = checkedByDefault,
-            Margin = new Padding(4, 3, 10, 2),
-            Font = new Font("Segoe UI", 8.5F)
+            Margin = new Padding(4, 2, 12, 2),
+            Font = UiTheme.FontSmall
         };
+
+    private void BuildEmptyStatePanel()
+    {
+        _pnlEmptyState = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = UiTheme.SurfaceBack,
+            Visible = false
+        };
+
+        var pnlCenter = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            Anchor = AnchorStyles.None
+        };
+
+        _lblEmptyTitle = new Label
+        {
+            Text = "No pending updates",
+            Font = UiTheme.FontTitle,
+            ForeColor = UiTheme.TextPrimary,
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 6),
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+
+        _lblEmptyBody = new Label
+        {
+            Text = "This PC is up to date for the current filters, or nothing matched.",
+            Font = UiTheme.FontBody,
+            ForeColor = UiTheme.TextMuted,
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 6),
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+
+        _lblEmptyLastChecked = new Label
+        {
+            Text = "Last checked: Never",
+            Font = UiTheme.FontSmall,
+            ForeColor = UiTheme.TextMuted,
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 16),
+            TextAlign = ContentAlignment.MiddleCenter
+        };
+
+        _btnEmptyRefresh = new Button
+        {
+            Text = "Refresh Updates",
+            Font = UiTheme.FontBold,
+            Size = new Size(150, 34),
+            FlatStyle = FlatStyle.System,
+            Margin = new Padding(0, 0, 0, 0)
+        };
+        _btnEmptyRefresh.Click += async (s, e) => await RefreshPendingUpdatesAsync();
+
+        pnlCenter.Controls.Add(_lblEmptyTitle);
+        pnlCenter.Controls.Add(_lblEmptyBody);
+        pnlCenter.Controls.Add(_lblEmptyLastChecked);
+        pnlCenter.Controls.Add(_btnEmptyRefresh);
+
+        _pnlEmptyState.Controls.Add(pnlCenter);
+        _pnlEmptyState.Resize += (_, _) =>
+        {
+            pnlCenter.Location = new Point(
+                Math.Max(10, (_pnlEmptyState.Width - pnlCenter.Width) / 2),
+                Math.Max(10, (_pnlEmptyState.Height - pnlCenter.Height) / 2)
+            );
+        };
+    }
 
     private void BuildGrid()
     {
@@ -268,52 +353,18 @@ public partial class MainForm : Form
             MultiSelect = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             RowHeadersVisible = false,
-            BorderStyle = BorderStyle.None,
-            BackgroundColor = Color.White,
-            GridColor = Color.FromArgb(226, 232, 240),
-            EnableHeadersVisualStyles = false,
-            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
-            ColumnHeadersHeight = 26,
-            RowTemplate = { Height = 22 },
-            Font = new Font("Segoe UI", 8.75F),
+            ShowCellToolTips = true,
             ClipboardCopyMode = DataGridViewClipboardCopyMode.EnableWithoutHeaderText
         };
 
-        _grid.ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
-        {
-            BackColor = Color.FromArgb(241, 245, 249),
-            ForeColor = Color.FromArgb(30, 41, 59),
-            Font = new Font("Segoe UI Semibold", 8.5F),
-            Alignment = DataGridViewContentAlignment.MiddleLeft,
-            Padding = new Padding(4, 0, 4, 0),
-            SelectionBackColor = Color.FromArgb(241, 245, 249),
-            SelectionForeColor = Color.FromArgb(30, 41, 59)
-        };
-
-        _grid.DefaultCellStyle = new DataGridViewCellStyle
-        {
-            BackColor = RowNormalBack,
-            ForeColor = Color.FromArgb(15, 23, 42),
-            SelectionBackColor = Color.FromArgb(219, 234, 254),
-            SelectionForeColor = Color.FromArgb(15, 23, 42),
-            Padding = new Padding(2, 0, 2, 0),
-            WrapMode = DataGridViewTriState.False
-        };
-
-        _grid.AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
-        {
-            BackColor = RowAltBack,
-            ForeColor = Color.FromArgb(15, 23, 42),
-            SelectionBackColor = Color.FromArgb(219, 234, 254),
-            SelectionForeColor = Color.FromArgb(15, 23, 42)
-        };
+        UiTheme.ApplyGridStyle(_grid);
 
         var chkCol = new DataGridViewCheckBoxColumn
         {
             Name = "Check",
             HeaderText = "",
-            Width = 28,
-            FillWeight = 18,
+            Width = 30,
+            FillWeight = 20,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
             FlatStyle = FlatStyle.Standard
         };
@@ -323,8 +374,8 @@ public partial class MainForm : Form
         {
             Name = "KB",
             HeaderText = "KB",
-            Width = 88,
-            FillWeight = 55,
+            Width = 95,
+            FillWeight = 60,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None
         });
         _grid.Columns.Add(new DataGridViewTextBoxColumn
@@ -338,32 +389,32 @@ public partial class MainForm : Form
         {
             Name = "SizeMB",
             HeaderText = "MB",
-            Width = 56,
-            FillWeight = 35,
+            Width = 60,
+            FillWeight = 38,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None
         });
         _grid.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Category",
             HeaderText = "Category",
-            Width = 120,
-            FillWeight = 80,
+            Width = 130,
+            FillWeight = 85,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None
         });
         _grid.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Severity",
             HeaderText = "Severity",
-            Width = 84,
-            FillWeight = 50,
+            Width = 90,
+            FillWeight = 55,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None
         });
         _grid.Columns.Add(new DataGridViewTextBoxColumn
         {
             Name = "Status",
             HeaderText = "Status",
-            Width = 88,
-            FillWeight = 50,
+            Width = 90,
+            FillWeight = 55,
             AutoSizeMode = DataGridViewAutoSizeColumnMode.None
         });
 
@@ -374,6 +425,7 @@ public partial class MainForm : Form
             col.SortMode = DataGridViewColumnSortMode.Automatic;
         }
 
+        _grid.CellToolTipTextNeeded += Grid_CellToolTipTextNeeded;
         _grid.CellDoubleClick += Grid_CellDoubleClick;
         _grid.SelectionChanged += (_, _) => UpdateDetailFromSelection();
         _grid.CellFormatting += Grid_CellFormatting;
@@ -381,21 +433,40 @@ public partial class MainForm : Form
         _grid.KeyDown += Grid_KeyDown;
     }
 
+    private void Grid_CellToolTipTextNeeded(object? sender, DataGridViewCellToolTipTextNeededEventArgs e)
+    {
+        if (e.RowIndex >= 0 && e.RowIndex < _grid.Rows.Count && e.ColumnIndex >= 0)
+        {
+            if (_grid.Rows[e.RowIndex].Tag is UpdateRow u)
+            {
+                if (_grid.Columns[e.ColumnIndex].Name == "Title")
+                {
+                    var descSnippet = string.IsNullOrWhiteSpace(u.Description) ? "" : "\n\n" + (u.Description.Length > 180 ? u.Description.Substring(0, 177) + "..." : u.Description);
+                    e.ToolTipText = $"{u.Title}{descSnippet}";
+                }
+                else if (_grid.Columns[e.ColumnIndex].Name == "KB")
+                {
+                    e.ToolTipText = u.Kb;
+                }
+            }
+        }
+    }
+
     private void BuildDetailPane()
     {
         _detailPanel = new Panel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(10, 8, 10, 8),
-            BackColor = Color.FromArgb(248, 250, 252)
+            Padding = new Padding(12, 10, 12, 10),
+            BackColor = UiTheme.SurfaceBack
         };
 
         _detailTitle = new Label
         {
             Dock = DockStyle.Top,
-            Height = 22,
-            Font = new Font("Segoe UI Semibold", 9.5F),
-            ForeColor = Color.FromArgb(15, 23, 42),
+            Height = 24,
+            Font = UiTheme.FontHeader,
+            ForeColor = UiTheme.TextPrimary,
             AutoEllipsis = true,
             Text = "Select an update"
         };
@@ -403,9 +474,9 @@ public partial class MainForm : Form
         _detailMeta = new Label
         {
             Dock = DockStyle.Top,
-            Height = 18,
-            Font = new Font("Segoe UI", 8.25F),
-            ForeColor = Color.FromArgb(71, 85, 105),
+            Height = 20,
+            Font = UiTheme.FontSmall,
+            ForeColor = UiTheme.TextMuted,
             AutoEllipsis = true,
             Text = ""
         };
@@ -415,8 +486,9 @@ public partial class MainForm : Form
             Dock = DockStyle.Bottom,
             Height = 20,
             Text = "",
-            LinkColor = Color.FromArgb(37, 99, 235),
-            ActiveLinkColor = Color.FromArgb(29, 78, 216),
+            Font = UiTheme.FontBody,
+            LinkColor = UiTheme.AccentPrimary,
+            ActiveLinkColor = UiTheme.AccentHover,
             AutoEllipsis = true,
             Visible = false
         };
@@ -435,15 +507,14 @@ public partial class MainForm : Form
             Multiline = true,
             ReadOnly = true,
             BorderStyle = BorderStyle.None,
-            BackColor = Color.FromArgb(248, 250, 252),
-            ForeColor = Color.FromArgb(30, 41, 59),
-            Font = new Font("Segoe UI", 8.75F),
+            BackColor = UiTheme.SurfaceBack,
+            ForeColor = UiTheme.TextPrimary,
+            Font = UiTheme.FontBody,
             ScrollBars = ScrollBars.Vertical,
             WordWrap = true,
             Text = "Description and release notes appear here when you select a row."
         };
 
-        // Add fill first, then docked edges (WinForms: last added for Dock.Top ends up highest)
         _detailPanel.Controls.Add(_detailDescription);
         _detailPanel.Controls.Add(_detailSupportLink);
         _detailPanel.Controls.Add(_detailMeta);
@@ -452,7 +523,7 @@ public partial class MainForm : Form
 
     private void BuildContextMenu()
     {
-        _gridContextMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+        _gridContextMenu = new ContextMenuStrip { Font = UiTheme.FontBody };
 
         var miDetails = new ToolStripMenuItem("View details…", null, (_, _) => ShowDetailsForContextOrSelection());
         var miCopyKb = new ToolStripMenuItem("Copy KB", null, (_, _) => CopySelectedKb());
@@ -502,21 +573,19 @@ public partial class MainForm : Form
 
         e.CellStyle ??= new DataGridViewCellStyle();
         e.CellStyle.ForeColor = SeverityColor(sev);
-        e.CellStyle.Font = new Font(_grid.Font, FontStyle.Bold);
+        e.CellStyle.Font = UiTheme.FontBold;
         e.CellStyle.SelectionForeColor = SeverityColor(sev);
     }
 
     private static Color SeverityColor(string severity)
     {
         if (severity.Contains("Critical", StringComparison.OrdinalIgnoreCase))
-            return SeverityCritical;
+            return UiTheme.SeverityCriticalText;
         if (severity.Contains("Important", StringComparison.OrdinalIgnoreCase))
-            return SeverityImportant;
+            return UiTheme.SeverityImportantText;
         if (severity.Contains("Moderate", StringComparison.OrdinalIgnoreCase))
-            return SeverityModerate;
-        if (severity.Contains("Low", StringComparison.OrdinalIgnoreCase))
-            return SeverityLow;
-        return SeverityDefault;
+            return UiTheme.SeverityModerateText;
+        return UiTheme.TextMuted;
     }
 
     private void Grid_CellMouseDown(object? sender, DataGridViewCellMouseEventArgs e)
@@ -549,7 +618,7 @@ public partial class MainForm : Form
         _detailTitle.Text = string.IsNullOrWhiteSpace(u.Title) ? u.Kb : u.Title;
         _detailMeta.Text =
             $"{u.Kb}  ·  {u.SizeMB:F1} MB  ·  {u.Categories}  ·  {u.Severity}  ·  " +
-            $"{(u.IsDownloaded ? "Downloaded" : "Not downloaded")}" +
+            $"{(u.IsDownloaded ? "Downloaded" : "Pending")}" +
             $"{(u.IsHidden ? "  ·  Hidden" : "")}" +
             $"{(u.RebootRequired ? "  ·  Reboot required" : "")}" +
             $"  ·  Rev {u.Revision}";
@@ -576,9 +645,11 @@ public partial class MainForm : Form
 
     private void ClearDetailPane()
     {
-        _detailTitle.Text = "Select an update";
+        _detailTitle.Text = _grid.Rows.Count > 0 ? "Select an update to see details" : "Nothing to show";
         _detailMeta.Text = "KB · size · category · severity";
-        _detailDescription.Text = "Description and release notes appear here when you select a row. Double-click or use the context menu for a full details window.";
+        _detailDescription.Text = _grid.Rows.Count > 0
+            ? "Select a row to view complete release notes and description."
+            : "No updates currently listed. Click Refresh to scan Windows Update.";
         _detailSupportLink.Visible = false;
         _detailSupportLink.Text = "";
         _detailSupportLink.Links.Clear();
@@ -672,7 +743,6 @@ public partial class MainForm : Form
             return;
         }
 
-        // Temporarily treat as checked path
         SetBusy(true, "Hiding updates...");
         try
         {
@@ -715,26 +785,38 @@ public partial class MainForm : Form
             _cts = new CancellationTokenSource();
             var items = await _service.SearchPendingAsync(options, statusProgress, _cts.Token);
 
+            _lastCheckedTime = DateTime.Now;
+            _lblEmptyLastChecked.Text = $"Last checked: {_lastCheckedTime.Value:yyyy-MM-dd HH:mm:ss}";
+
             _currentRows.AddRange(items);
             _grid.SuspendLayout();
-            foreach (var u in items)
+
+            if (items.Count == 0)
             {
-                string statusStr = u.IsDownloaded ? "Downloaded" : (u.IsHidden ? "Hidden" : "Pending");
-                int rowIndex = _grid.Rows.Add(false, u.Kb, u.Title, u.SizeMB.ToString("F1"), u.Categories, u.Severity, statusStr);
-                var row = _grid.Rows[rowIndex];
-                row.Tag = u;
-                ApplyRowChrome(row, rowIndex, u);
+                _pnlEmptyState.Visible = true;
+                _grid.Visible = false;
             }
-
-            _grid.ResumeLayout();
-
-            if (_grid.Rows.Count > 0)
+            else
             {
+                _pnlEmptyState.Visible = false;
+                _grid.Visible = true;
+
+                foreach (var u in items)
+                {
+                    string statusStr = u.IsDownloaded ? "Downloaded" : (u.IsHidden ? "Hidden" : "Pending");
+                    int rowIndex = _grid.Rows.Add(false, u.Kb, u.Title, u.SizeMB.ToString("F1"), u.Categories, u.Severity, statusStr);
+                    var row = _grid.Rows[rowIndex];
+                    row.Tag = u;
+                    ApplyRowChrome(row, rowIndex, u);
+                }
+
                 _grid.ClearSelection();
                 _grid.Rows[0].Selected = true;
                 _grid.CurrentCell = _grid.Rows[0].Cells["KB"];
                 UpdateDetailFromSelection();
             }
+
+            _grid.ResumeLayout();
 
             _lblCount.Text = $"Updates: {items.Count}";
             _lblStatus.Text = $"Ready. Found {items.Count} update(s).";
@@ -752,13 +834,12 @@ public partial class MainForm : Form
 
     private void ApplyRowChrome(DataGridViewRow row, int index, UpdateRow update)
     {
-        var back = (index % 2 == 0) ? RowNormalBack : RowAltBack;
+        var back = (index % 2 == 0) ? UiTheme.SurfaceBack : UiTheme.GridRowAltBack;
         row.DefaultCellStyle.BackColor = back;
 
-        // Subtle left emphasis for security rows
         if (SafetyGuards.IsSecurityUpdate(update))
         {
-            row.Cells["KB"].Style.Font = new Font(_grid.Font, FontStyle.Bold);
+            row.Cells["KB"].Style.Font = UiTheme.FontBold;
         }
     }
 
@@ -794,11 +875,9 @@ public partial class MainForm : Form
         var list = new List<UpdateRow>();
         foreach (DataGridViewRow row in _grid.Rows)
         {
-            bool isChecked = Convert.ToBoolean(row.Cells["Check"].Value ?? false);
-            if (isChecked && row.Tag is UpdateRow u)
+            if (Convert.ToBoolean(row.Cells["Check"].Value) && row.Tag is UpdateRow u)
                 list.Add(u);
         }
-
         return list;
     }
 
@@ -811,14 +890,14 @@ public partial class MainForm : Form
             return;
         }
 
-        SetBusy(true, "Downloading updates...");
+        SetBusy(true, "Downloading selected updates...");
         try
         {
             var progress = new Progress<OpProgress>(p =>
             {
                 this.SafeInvoke(() =>
                 {
-                    _lblStatus.Text = $"{p.Operation} ({p.Percent}%)";
+                    _lblStatus.Text = $"[{p.Percent}%] {p.Operation}";
                     _progressBar.Style = ProgressBarStyle.Continuous;
                     _progressBar.Value = Math.Clamp(p.Percent, 0, 100);
                 });
@@ -826,12 +905,11 @@ public partial class MainForm : Form
 
             _cts = new CancellationTokenSource();
             await _service.DownloadAsync(checkedItems, progress, _cts.Token);
-            MessageBox.Show("Download complete.", "Download", MessageBoxButtons.OK, MessageBoxIcon.Information);
             await RefreshPendingUpdatesAsync();
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Download failed: {ex.Message}", "Download Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"Download failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -844,58 +922,43 @@ public partial class MainForm : Form
         var checkedItems = GetCheckedRows();
         if (checkedItems.Count == 0)
         {
-            MessageBox.Show("No updates selected for installation.", "Install Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("No updates selected to install.", "Install", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
-        if (SafetyGuards.IsDomainController() && !_chkAllowDc.Checked)
+        var opt = new InstallOptions
         {
-            var confirm = MessageBox.Show(
-                "THIS MACHINE IS A DOMAIN CONTROLLER.\n\nAre you absolutely sure you want to install updates?",
-                "Domain Controller Warning",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-
-            if (confirm != DialogResult.Yes) return;
-        }
-
-        var opts = new InstallOptions
-        {
-            WhatIf = false,
-            Force = false,
             RebootIfRequired = _chkReboot.Checked,
             AllowDomainController = _chkAllowDc.Checked
         };
 
-        SetBusy(true, "Installing updates...");
+        SetBusy(true, "Installing selected updates...");
         try
         {
             var progress = new Progress<OpProgress>(p =>
             {
                 this.SafeInvoke(() =>
                 {
-                    _lblStatus.Text = $"{p.Operation} ({p.Percent}%)";
+                    _lblStatus.Text = $"[{p.Percent}%] {p.Operation}";
                     _progressBar.Style = ProgressBarStyle.Continuous;
                     _progressBar.Value = Math.Clamp(p.Percent, 0, 100);
                 });
             });
 
             _cts = new CancellationTokenSource();
-            var res = await _service.InstallAsync(checkedItems, opts, progress, _cts.Token);
+            var res = await _service.InstallAsync(checkedItems, opt, progress, _cts.Token);
 
-            if (res.RebootRequired)
-            {
-                _lblReboot.Text = "Reboot: Required";
-                _lblReboot.ForeColor = Color.Red;
-            }
+            MessageBox.Show(
+                $"Installation complete:\nInstalled: {res.InstalledCount}\nFailed: {res.FailedCount}\nReboot required: {res.RebootRequired}\n\n{res.Message}",
+                res.Success ? "Success" : "Warning",
+                MessageBoxButtons.OK,
+                res.Success ? MessageBoxIcon.Information : MessageBoxIcon.Warning);
 
-            MessageBox.Show(res.Message, res.Success ? "Install Complete" : "Install Failed", MessageBoxButtons.OK,
-                res.Success ? MessageBoxIcon.Information : MessageBoxIcon.Error);
             await RefreshPendingUpdatesAsync();
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Install error: {ex.Message}", "Install Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            MessageBox.Show($"Install failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -975,8 +1038,7 @@ public partial class MainForm : Form
         else if (e.Control && e.KeyCode == Keys.A)
         {
             e.Handled = true;
-            foreach (DataGridViewRow r in _grid.Rows)
-                r.Cells["Check"].Value = true;
+            SelectAllRows();
         }
     }
 
@@ -984,6 +1046,13 @@ public partial class MainForm : Form
     {
         _toolStrip.Enabled = !busy;
         _grid.Enabled = !busy;
+        _chkDrivers.Enabled = !busy;
+        _chkOptional.Enabled = !busy;
+        _chkMsUpdate.Enabled = !busy;
+        _chkPersistHide.Enabled = !busy;
+        _chkAllowDc.Enabled = !busy;
+        _chkReboot.Enabled = !busy;
+
         _lblStatus.Text = statusMessage;
         _progressBar.Visible = busy;
         if (busy)

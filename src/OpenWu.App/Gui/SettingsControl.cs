@@ -30,66 +30,52 @@ public sealed class SettingsControl : UserControl
     private void InitializeComponent()
     {
         Dock = DockStyle.Fill;
-        Padding = new Padding(15);
+        BackColor = UiTheme.PageBack;
+        Padding = new Padding(16);
+
+        var pnlHeader = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 36,
+            Padding = new Padding(0, 0, 0, 8)
+        };
 
         var lblBlurb = new Label
         {
-            Text = "Policy Settings — Saved to %ProgramData%\\OpenWU\\policy.json. Changes apply to both GUI and CLI.",
-            Font = new Font(Font, FontStyle.Bold),
-            Dock = DockStyle.Top,
-            Height = 30
-        };
-
-        var pnlGrid = new TableLayoutPanel
-        {
+            Text = "Policy Configuration — Saved to %ProgramData%\\OpenWU\\policy.json. Appiles to both GUI and CLI.",
+            Font = UiTheme.FontBold,
+            ForeColor = UiTheme.TextMuted,
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 7,
-            AutoSize = true,
-            Padding = new Padding(0, 10, 0, 0)
+            TextAlign = ContentAlignment.MiddleLeft
         };
-        pnlGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 180F));
-        pnlGrid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        pnlHeader.Controls.Add(lblBlurb);
 
-        // 1. Service
-        pnlGrid.Controls.Add(new Label { Text = "Update Service:", Anchor = AnchorStyles.Left }, 0, 0);
-        _cmbService = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
-        _cmbService.Items.AddRange(new object[] { "MicrosoftUpdate", "WindowsUpdate" });
-        pnlGrid.Controls.Add(_cmbService, 1, 0);
+        var pnlButtons = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 44,
+            Padding = new Padding(0, 8, 0, 0)
+        };
 
-        // 2. Reboot Behavior
-        pnlGrid.Controls.Add(new Label { Text = "Default Reboot:", Anchor = AnchorStyles.Left }, 0, 1);
-        _cmbReboot = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 220 };
-        _cmbReboot.Items.AddRange(new object[] { "Never", "IfRequired", "Always" });
-        pnlGrid.Controls.Add(_cmbReboot, 1, 1);
+        _btnSave = new Button
+        {
+            Text = "Save Policy",
+            Size = new Size(120, 32),
+            Anchor = AnchorStyles.Right | AnchorStyles.Bottom,
+            Location = new Point(pnlButtons.Width - 120, 8),
+            Font = UiTheme.FontBold,
+            FlatStyle = FlatStyle.System
+        };
 
-        // 3. Flags
-        _chkIncludeDrivers = new CheckBox { Text = "Include Driver Updates by Default", AutoSize = true };
-        _chkIncludeOptional = new CheckBox { Text = "Include Optional Updates by Default", AutoSize = true };
-        _chkAllowDc = new CheckBox { Text = "Allow Installation on Domain Controller", AutoSize = true, ForeColor = Color.DarkRed };
-
-        var flowFlags = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true };
-        flowFlags.Controls.Add(_chkIncludeDrivers);
-        flowFlags.Controls.Add(_chkIncludeOptional);
-        flowFlags.Controls.Add(_chkAllowDc);
-
-        pnlGrid.Controls.Add(new Label { Text = "Defaults & Security:", Anchor = AnchorStyles.Left }, 0, 2);
-        pnlGrid.Controls.Add(flowFlags, 1, 2);
-
-        // 4. Deny Titles
-        pnlGrid.Controls.Add(new Label { Text = "Deny Titles Contains:\n(One per line)", Anchor = AnchorStyles.Top | AnchorStyles.Left }, 0, 3);
-        _txtDenyTitles = new TextBox { Multiline = true, Height = 70, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical };
-        pnlGrid.Controls.Add(_txtDenyTitles, 1, 3);
-
-        // 5. Hidden KBs
-        pnlGrid.Controls.Add(new Label { Text = "Persisted Hidden KBs:\n(One per line)", Anchor = AnchorStyles.Top | AnchorStyles.Left }, 0, 4);
-        _txtHiddenKbs = new TextBox { Multiline = true, Height = 70, Dock = DockStyle.Fill, ScrollBars = ScrollBars.Vertical };
-        pnlGrid.Controls.Add(_txtHiddenKbs, 1, 4);
-
-        // Buttons
-        var pnlButtons = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 45, FlowDirection = FlowDirection.RightToLeft };
-        _btnReset = new Button { Text = "Reset to Defaults", Size = new Size(130, 32), Margin = new Padding(5) };
-        _btnSave = new Button { Text = "Save Policy", Size = new Size(110, 32), Margin = new Padding(5) };
+        _btnReset = new Button
+        {
+            Text = "Reset to Defaults",
+            Size = new Size(130, 32),
+            Anchor = AnchorStyles.Right | AnchorStyles.Bottom,
+            Location = new Point(pnlButtons.Width - 260, 8),
+            Font = UiTheme.FontBody,
+            FlatStyle = FlatStyle.System
+        };
 
         _btnSave.Click += (s, e) => SavePolicy();
         _btnReset.Click += (s, e) => ResetPolicy();
@@ -97,8 +83,127 @@ public sealed class SettingsControl : UserControl
         pnlButtons.Controls.Add(_btnSave);
         pnlButtons.Controls.Add(_btnReset);
 
-        Controls.Add(pnlGrid);
-        Controls.Add(lblBlurb);
+        var pnlMain = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 2,
+            Padding = new Padding(0, 4, 0, 4)
+        };
+        pnlMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        pnlMain.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+        pnlMain.RowStyles.Add(new RowStyle(SizeType.Percent, 45F));
+        pnlMain.RowStyles.Add(new RowStyle(SizeType.Percent, 55F));
+
+        // Group 1: Source & Defaults
+        var grpDefaults = new GroupBox
+        {
+            Text = "Update Source & Install Defaults",
+            Font = UiTheme.FontBold,
+            ForeColor = UiTheme.TextPrimary,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 0, 8, 8),
+            Padding = new Padding(12)
+        };
+
+        var flowDefaults = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = true
+        };
+
+        flowDefaults.Controls.Add(new Label { Text = "Catalog Service:", Font = UiTheme.FontBody, AutoSize = true, Margin = new Padding(0, 4, 0, 2) });
+        _cmbService = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200, Font = UiTheme.FontBody };
+        _cmbService.Items.AddRange(new object[] { "MicrosoftUpdate", "WindowsUpdate" });
+        flowDefaults.Controls.Add(_cmbService);
+
+        flowDefaults.Controls.Add(new Label { Text = "Default Reboot Action:", Font = UiTheme.FontBody, AutoSize = true, Margin = new Padding(0, 10, 0, 2) });
+        _cmbReboot = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 200, Font = UiTheme.FontBody };
+        _cmbReboot.Items.AddRange(new object[] { "Never", "IfRequired", "Always" });
+        flowDefaults.Controls.Add(_cmbReboot);
+
+        _chkIncludeDrivers = new CheckBox { Text = "Include Driver Updates by Default", Font = UiTheme.FontBody, AutoSize = true, Margin = new Padding(0, 12, 0, 2) };
+        _chkIncludeOptional = new CheckBox { Text = "Include Optional Updates by Default", Font = UiTheme.FontBody, AutoSize = true, Margin = new Padding(0, 6, 0, 2) };
+
+        flowDefaults.Controls.Add(_chkIncludeDrivers);
+        flowDefaults.Controls.Add(_chkIncludeOptional);
+
+        grpDefaults.Controls.Add(flowDefaults);
+
+        // Group 2: Domain Controller & Guards
+        var grpSafety = new GroupBox
+        {
+            Text = "Domain Controller & Safety Guards",
+            Font = UiTheme.FontBold,
+            ForeColor = UiTheme.TextPrimary,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(8, 0, 0, 8),
+            Padding = new Padding(12)
+        };
+
+        var flowSafety = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoScroll = true
+        };
+
+        _chkAllowDc = new CheckBox
+        {
+            Text = "Allow installation on Domain Controller",
+            Font = UiTheme.FontBold,
+            ForeColor = Color.FromArgb(185, 28, 28),
+            AutoSize = true,
+            Margin = new Padding(0, 4, 0, 8)
+        };
+        flowSafety.Controls.Add(_chkAllowDc);
+
+        flowSafety.Controls.Add(new Label { Text = "Deny Titles Containing (one per line):", Font = UiTheme.FontBody, AutoSize = true, Margin = new Padding(0, 4, 0, 2) });
+        _txtDenyTitles = new TextBox
+        {
+            Multiline = true,
+            Height = 110,
+            Width = 240,
+            Font = UiTheme.FontBody,
+            ScrollBars = ScrollBars.Vertical
+        };
+        flowSafety.Controls.Add(_txtDenyTitles);
+
+        grpSafety.Controls.Add(flowSafety);
+
+        // Group 3: Hidden KBs
+        var grpHidden = new GroupBox
+        {
+            Text = "Persisted Hidden KBs",
+            Font = UiTheme.FontBold,
+            ForeColor = UiTheme.TextPrimary,
+            Dock = DockStyle.Fill,
+            Margin = new Padding(0, 8, 8, 0),
+            Padding = new Padding(12)
+        };
+
+        var pnlHidden = new Panel { Dock = DockStyle.Fill };
+        pnlHidden.Controls.Add(new Label { Text = "KBs hidden across search results (one per line, e.g. KB5031234):", Font = UiTheme.FontBody, Dock = DockStyle.Top, Height = 22 });
+        _txtHiddenKbs = new TextBox
+        {
+            Multiline = true,
+            Dock = DockStyle.Fill,
+            Font = UiTheme.FontBody,
+            ScrollBars = ScrollBars.Vertical
+        };
+        pnlHidden.Controls.Add(_txtHiddenKbs);
+        grpHidden.Controls.Add(pnlHidden);
+
+        pnlMain.Controls.Add(grpDefaults, 0, 0);
+        pnlMain.Controls.Add(grpSafety, 1, 0);
+        pnlMain.Controls.Add(grpHidden, 0, 1);
+        pnlMain.SetColumnSpan(grpHidden, 2);
+
+        Controls.Add(pnlMain);
+        Controls.Add(pnlHeader);
         Controls.Add(pnlButtons);
     }
 
@@ -130,7 +235,7 @@ public sealed class SettingsControl : UserControl
             };
 
             _service.PolicyStore.Save(p);
-            MessageBox.Show("Policy successfully saved.", "Policy Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("Policy successfully saved to %ProgramData%\\OpenWU\\policy.json", "Policy Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
